@@ -5,7 +5,7 @@
 | **Product** | G-code Toolpath Analyser |
 | **Version** | 1.0 |
 | **Status** | Shipped (v1.0.0) |
-| **Owner** | RAI |
+| **Owner** | Jackson(KyintHot) |
 | **Last updated** | 2026-11-15 |
 
 ---
