@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G-code Toolpath Analyser</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 17 L8 5 L13 17 M5.2 13 h5.6 M15 5 h6 M15 5 v12 h6 v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      </span>
+      <div>
+        <h1>G-code Toolpath Analyser</h1>
+        <p>Interpolation &middot; acceleration-limited timing &middot; material &amp; envelope</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="file-chip" id="fileChip" hidden></span>
+      <div class="sample-menu">
+        <button class="btn ghost" id="sampleBtn" type="button">Load sample</button>
+        <div class="sample-list" id="sampleList"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="sidebar">
+      <section class="panel">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button">
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 16 V4 M7 9 l5-5 5 5 M4 16 v3 a1 1 0 0 0 1 1 h14 a1 1 0 0 0 1-1 v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <strong>Drop a .gcode file</strong>
+          <span>or click to browse &middot; parsed locally</span>
+          <input type="file" id="fileInput" accept=".gcode,.gco,.g,.nc,.ngc,.tap,.txt" hidden>
+        </div>
+        <p class="hint" id="loadHint">Nothing loaded yet. Standard G0/G1/G2/G3, feedrates, extrude values.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Machine</h2>
+          <button class="link" id="resetMachine" type="button">reset</button>
+        </div>
+        <label class="field">
+          <span>Profile</span>
+          <select id="preset"></select>
+        </label>
+        <div class="grid2">
+          <label class="field"><span>Acceleration</span>
+            <div class="unit"><input type="number" id="accel" step="100" min="10"><i>mm/s&sup2;</i></div>
+          </label>
+          <label class="field"><span>Travel accel</span>
+            <div class="unit"><input type="number" id="travel_accel" step="100" min="10"><i>mm/s&sup2;</i></div>
+          </label>
+        </div>
+        <label class="field">
+          <span>Cornering model</span>
+          <select id="junction_model">
+            <option value="deviation">Junction deviation</option>
+            <option value="jerk">Classic jerk</option>
+          </select>
+        </label>
+        <div class="grid2">
+          <label class="field" id="jdField"><span>Junction dev.</span>
+            <div class="unit"><input type="number" id="junction_deviation" step="0.001" min="0"><i>mm</i></div>
+          </label>
+          <label class="field" id="jerkField" hidden><span>Jerk</span>
+            <div class="unit"><input type="number" id="jerk" step="0.5" min="0"><i>mm/s</i></div>
+          </label>
+          <label class="field"><span>Arc tolerance</span>
+            <div class="unit"><input type="number" id="arc_tolerance" step="0.005" min="0.0005"><i>mm</i></div>
+          </label>
+        </div>
+        <div class="grid3">
+          <label class="field"><span>Vx max</span>
+            <div class="unit"><input type="number" id="max_vx" step="10"><i>mm/s</i></div>
+          </label>
+          <label class="field"><span>Vy max</span>
+            <div class="unit"><input type="number" id="max_vy" step="10"><i>mm/s</i></div>
+          </label>
+          <label class="field"><span>Vz max</span>
+            <div class="unit"><input type="number" id="max_vz" step="1"><i>mm/s</i></div>
+          </label>
+        </div>
+        <details class="more">
+          <summary>Build volume</summary>
+          <div class="grid3">
+            <label class="field"><span>X</span><div class="unit"><input type="number" id="build_x" step="10"><i>mm</i></div></label>
+            <label class="field"><span>Y</span><div class="unit"><input type="number" id="build_y" step="10"><i>mm</i></div></label>
+            <label class="field"><span>Z</span><div class="unit"><input type="number" id="build_z" step="10"><i>mm</i></div></label>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Material</h2></div>
+        <div class="grid2">
+          <label class="field"><span>Filament &Oslash;</span>
+            <div class="unit"><input type="number" id="filament_diameter" step="0.05" min="0.5"><i>mm</i></div>
+          </label>
+          <label class="field"><span>Density</span>
+            <div class="unit"><input type="number" id="density" step="0.01"><i>g/cm&sup3;</i></div>
+          </label>
+        </div>
+        <button class="btn primary" id="recompute" type="button" disabled>Recompute metrics</button>
+      </section>
+
+      <section class="panel" id="notesPanel" hidden>
+        <div class="panel-head"><h2>Notes</h2><span class="count" id="noteCount"></span></div>
+        <ul class="notes" id="notes"></ul>
+      </section>
+
+      <p class="cli-hint">CLI: <code>python -m gcode_analyzer.cli file.gcode</code></p>
+    </aside>
+
+    <main class="content">
+      <div class="kpis" id="kpis">
+        <article class="kpi skeleton"><span>Print time</span><strong>&mdash;</strong><small>acceleration-aware</small></article>
+        <article class="kpi skeleton"><span>Material</span><strong>&mdash;</strong><small>filament &amp; volume</small></article>
+        <article class="kpi skeleton"><span>Bounding box</span><strong>&mdash;</strong><small>part envelope</small></article>
+        <article class="kpi skeleton"><span>Motion</span><strong>&mdash;</strong><small>path &amp; layers</small></article>
+      </div>
+
+      <div class="stage">
+        <div class="toolbar">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="path" role="tab">3D toolpath</button>
+            <button class="tab" data-tab="analysis" role="tab">Analysis</button>
+          </div>
+          <div class="toolbar-right">
+            <label class="check"><input type="checkbox" id="showTravel" checked><span>travel</span></label>
+            <label class="check"><input type="checkbox" id="speedColor" checked><span>speed colour</span></label>
+            <span class="chip" id="pointChip"></span>
+          </div>
+        </div>
+
+        <div class="view view-path" id="viewPath">
+          <div id="plot3d"></div>
+          <div class="empty" id="emptyState">
+            <div class="empty-inner">
+              <h2>No toolpath loaded</h2>
+              <p>Drop a G-code file anywhere in this window, or start with a sample.</p>
+              <div class="sample-cards" id="emptySamples"></div>
+            </div>
+          </div>
+          <div class="loading" id="loading" hidden>
+            <div class="spinner"></div>
+            <span id="loadingText">Analysing&hellip;</span>
+          </div>
+          <div class="layerbar" id="layerBar" hidden>
+            <button class="play" id="playBtn" type="button" aria-label="Play layers">
+              <svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 2.5 L13 8 L4 13.5 Z" fill="currentColor"/></svg>
+            </button>
+            <label class="check compact"><input type="checkbox" id="layerMode"><span>single layer</span></label>
+            <input type="range" id="layerSlider" min="0" max="0" value="0" step="1" disabled>
+            <span class="layer-label" id="layerLabel">&mdash;</span>
+          </div>
+        </div>
+
+        <div class="view view-analysis" id="viewAnalysis" hidden>
+          <div class="analysis-scroll">
+            <div class="charts">
+              <div class="chart-card"><h3>Time per layer</h3><div class="chart" id="layerChart"></div></div>
+              <div class="chart-card"><h3>Time by feedrate</h3><div class="chart" id="feedChart"></div></div>
+            </div>
+            <div class="tables">
+              <div class="chart-card"><h3>Timing breakdown</h3><table class="data" id="timeTable"></table></div>
+              <div class="chart-card"><h3>File diagnostics</h3><table class="data" id="diagTable"></table></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="error-banner" id="errorBanner" hidden>
+        <strong>Could not analyse that file</strong>
+        <span id="errorText"></span>
+        <button class="link" id="dismissError" type="button">dismiss</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="/static/vendor/plotly.min.js"></script>
+<script src="/static/toolpath-plot.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

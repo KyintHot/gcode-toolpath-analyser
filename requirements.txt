@@ -1,0 +1,7 @@
+# G-code Toolpath Analyser
+# The 3D renderer (Plotly 2.35.2) is vendored in web/vendor/plotly.min.js,
+# so no JS toolchain or npm install is needed.
+
+fastapi>=0.110,<1
+uvicorn>=0.29,<1
+pytest>=8
