@@ -45,6 +45,18 @@ the number.
 - **Local by default** — nothing is uploaded anywhere; Plotly is vendored, so it
   works offline.
 
+## Screenshots
+
+**Analysis tab** — time per layer, time by feedrate, the timing breakdown and file
+diagnostics, all derived from the same planned motion.
+
+![Analysis tab](docs/analysis.png)
+
+**Standalone report** — `--html` writes one offline file with the Plotly bundle
+inlined, for archiving or sharing.
+
+![Standalone HTML report](docs/report.png)
+
 ## Quick start
 
 ```bash
