@@ -1,0 +1,4 @@
+# Third-party bundles are vendored byte-for-byte. Marking them binary stops
+# Git from normalising line endings, so a clone gets exactly the same bytes
+# (and the same SRI-able checksum) as the copy the app was developed against.
+web/vendor/** binary
