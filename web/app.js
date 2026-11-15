@@ -422,6 +422,10 @@
   }
 
   function renderCharts() {
+    // Plotly measures its container when it draws. The analysis view is hidden
+    // most of the time, so drawing into it would size the charts against a
+    // zero-width box and they spill out of their cards.
+    if ($("viewAnalysis").hidden || !state.data) return;
     const layers = state.data.metrics.layers || [];
     const feeds = state.data.metrics.feeds || [];
     const plotConfig = { displayModeBar: false, responsive: true };
@@ -449,7 +453,7 @@
     }
 
     if (feeds.length) {
-      const feedsSorted = feeds.slice().sort((a, b) => a.time_s - b.time_s);
+      const feedsSorted = feeds.slice().sort((a, b) => a.feed_mm_s - b.feed_mm_s);
       Plotly.react(
         "feedChart",
         [{
@@ -704,7 +708,16 @@
     if (tab === "path" && state.plotReady) {
       Plotly.Plots.resize($("plot3d"));
     }
-    if (tab === "analysis") renderCharts();
+    if (tab === "analysis") {
+      renderCharts();
+      // The cards have just become measurable; fit the charts to them.
+      requestAnimationFrame(() => {
+        for (const id of ["layerChart", "feedChart"]) {
+          const el = $(id);
+          if (el && el.data) Plotly.Plots.resize(el);
+        }
+      });
+    }
   }
 
   /* ------------------------------------------------------------------- init */
